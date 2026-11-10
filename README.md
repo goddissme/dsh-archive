@@ -13,14 +13,23 @@ DSH 官方的「归档」只是把会话从侧栏隐藏，日志永远留在磁�
 dsh plugin --profile desktop add ./dsh-archive
 
 # 2) 打包后的 tarball（分发）
-dsh plugin --profile desktop add ./dsh-archive-0.2.1.tgz
+dsh plugin --profile desktop add ./dsh-archive-0.3.0.tgz
 
 # 3) GitHub 源码（本插件零构建，纯 JS，装完即可用）
-dsh plugin --profile desktop add github:<you>/dsh-archive
+dsh plugin --profile desktop add github:goddissme/dsh-archive
 ```
 
 桌面版也可以直接让 DSH 的插件管理器安装本地目录或 tarball（`dsh plugin add` 与「设置 → 插件」走同一套 pnpm + profile 注册）。
-装完刷新页面（必要时重启 DSH）生效。
+装完刷新页面即可生效（宿主插件由 HMR 热应用，无需重启 DSH）。
+
+从 0.2.x 升级时先移除旧包名，再安装新包：
+
+```sh
+dsh plugin --profile desktop remove dsh-archive-mgr
+dsh plugin --profile desktop add ./dsh-archive-0.3.0.tgz
+```
+
+回收站数据目录沿用 `$DSH_HOME/archive-mgr/`，升级后原条目仍在。
 
 ## 使用
 
@@ -47,7 +56,7 @@ dsh plugin --profile desktop add github:<you>/dsh-archive
 | 回收站 | `$DSH_HOME/archive-mgr/trash/<时间戳>-<会话ID>/`（含 `session/`、`projection.json`、`meta.json`） |
 | 归档标记 | `$DSH_HOME/storages/workspace.json` 的 `global.archivedSessionIds` |
 
-`$DSH_HOME` 默认是 `~/.dsh`，可用环境变量覆盖。
+`$DSH_HOME` 默认是 `~/.dsh`，可用环境变量覆盖。数据目录继续叫 `archive-mgr`，是为了让升级前的回收站条目仍能列出和还原。
 
 ## 安全边界
 
@@ -68,8 +77,9 @@ dsh plugin --profile desktop remove dsh-archive
 ## 兼容性
 
 - 目标 DSH `0.1.x / 0.2.x`（Web / Desktop profile）。
-- 只依赖三个公开宿主服务：`workspaceRegistry`（`archivedSessionIds`、`enqueueOperation` / `requireState` / `setState` / `list`）、`sessionQuery`（`listSessions` / `readTitleSnapshots`）、`webServer`（`register`）。
-- 客户端只用一个 `locale` 服务做中英文切换，不依赖 React、主题或插槽。
+- 宿主必需三个公开服务：`workspaceRegistry`（`archivedSessionIds`、`enqueueOperation` / `requireState` / `setState` / `list`）、`sessionQuery`（`listSessions` / `readTitleSnapshots`）、`webServer`（`register`）。
+- 宿主还**可选**读取 `sessions`（`get` / `liveEntryFor`）把活动会话从内存会话表摘除，并广播 `api-session/removed`。`sessions` 不存在时仍会广播事件，侧栏行照样立刻消失。
+- 客户端只用一个 `locale` 服务做中英文切换，不依赖 React、主题或插槽；删除/还原后会**可选**调用 `sessions.refresh()` 同步侧栏会话目录。
 - 任一依赖缺失即降级（fail-open），不会阻塞原生归档。
 
 ## 发布
@@ -78,9 +88,16 @@ dsh plugin --profile desktop remove dsh-archive
 npm publish          # 已用 files 白名单，只发布 src/lib/cordis.patch.yml/README/LICENSE
 ```
 
-或打成 tarball 分发：`npm pack`（产物 `dsh-archive-0.2.1.tgz`）。
+或打成 tarball 分发：`npm pack`（产物 `dsh-archive-0.3.0.tgz`）。
 
 ## 更新日志
+
+### 0.3.0
+- **破坏性改名**：包名由 `dsh-archive-mgr` 改为 `dsh-archive`，与 GitHub 仓库同名。
+  HTTP API 前缀改为 `/dsh-archive/api`，客户端插件 id 改为 `dsh-archive`。
+- 数据目录仍是 `$DSH_HOME/archive-mgr/`，升级后原回收站条目不受影响。
+- 升级步骤：先 `dsh plugin --profile desktop remove dsh-archive-mgr`，再安装
+  `dsh-archive`；旧包与新包不要同时启用。
 
 ### 0.2.1
 - 修复：删除归档会话后，该会话仍留在侧栏工作区列表里、必须重启 DSH 才消失。
@@ -90,7 +107,7 @@ npm publish          # 已用 files 白名单，只发布 src/lib/cordis.patch.y
   活动会话残留行被刷新重新带回。
 
 ### 0.2.0
-- 包名改为 `dsh-archive`；插件卸载后路由立即失效。
+- 包名改为 `dsh-archive-mgr`；插件卸载后路由立即失效。
 
 ## 开发
 

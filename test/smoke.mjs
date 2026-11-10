@@ -1,4 +1,4 @@
-// Smoke test for dsh-archive-mgr host half.
+// Smoke test for dsh-archive host half.
 //
 // Runs the real plugin code (routes + fs moves + registry serialization)
 // against a throwaway DSH_HOME and fake registry/session-query services.
@@ -82,7 +82,7 @@ async function call(path, method = 'GET', body) {
 }
 
 // 1) list
-let r = await call('/dsh-archive-mgr/api/archived');
+let r = await call('/dsh-archive/api/archived');
 assert.equal(r.status, 200);
 assert.equal(r.body.total, 1);
 assert.equal(r.body.items[0].title, '测试会话');
@@ -90,7 +90,7 @@ assert.equal(r.body.items[0].hasLog, true);
 assert.deepEqual(state.archivedSessionIds, [sessionId]);
 
 // 2) delete -> moves to trash, drops the archived marker
-r = await call('/dsh-archive-mgr/api/delete', 'POST', { sessionIds: [sessionId] });
+r = await call('/dsh-archive/api/delete', 'POST', { sessionIds: [sessionId] });
 assert.equal(r.body.ok, true, JSON.stringify(r.body));
 assert.equal(r.body.deleted[0].catalogRemoved, true, 'a deletable session leaves the live catalog');
 assert.equal(detached, 1, 'the live session is detached so host list no longer returns it');
@@ -113,12 +113,12 @@ assert.equal(meta.sessionId, sessionId);
 assert.equal(meta.sizeBytes, 2048);
 
 // 3) trash list
-r = await call('/dsh-archive-mgr/api/trash');
+r = await call('/dsh-archive/api/trash');
 assert.equal(r.body.total, 1);
 assert.equal(r.body.items[0].trashId, trashId);
 
 // 4) restore -> files back, session unarchived (stays in the sidebar)
-r = await call('/dsh-archive-mgr/api/trash/restore', 'POST', { trashId });
+r = await call('/dsh-archive/api/trash/restore', 'POST', { trashId });
 assert.equal(r.body.ok, true, JSON.stringify(r.body));
 assert.ok(existsSync(join(sessionDir, 'session.v4.jsonl.zstd')), 'session log restored');
 assert.ok(existsSync(join(projcacheDir, sessionId + '.json')), 'cache restored');
@@ -127,10 +127,10 @@ assert.equal((await readdir(trashRoot)).length, 0);
 
 // 5) delete again, then purge permanently
 state = { archivedSessionIds: [sessionId] };
-r = await call('/dsh-archive-mgr/api/delete', 'POST', { sessionIds: [sessionId] });
+r = await call('/dsh-archive/api/delete', 'POST', { sessionIds: [sessionId] });
 assert.equal(r.body.ok, true);
 const trashId2 = (await readdir(trashRoot))[0];
-r = await call('/dsh-archive-mgr/api/trash/delete', 'POST', { trashId: trashId2 });
+r = await call('/dsh-archive/api/trash/delete', 'POST', { trashId: trashId2 });
 assert.equal(r.body.ok, true);
 assert.equal((await readdir(trashRoot)).length, 0);
 
@@ -139,7 +139,7 @@ await mkdir(sessionDir, { recursive: true });
 await writeFile(join(sessionDir, 'session.v4.jsonl.zstd'), Buffer.alloc(2048, 7));
 state = { archivedSessionIds: [sessionId] };
 const before = await readFile(join(sessionDir, 'session.v4.jsonl.zstd'));
-r = await call('/dsh-archive-mgr/api/unarchive', 'POST', { sessionId });
+r = await call('/dsh-archive/api/unarchive', 'POST', { sessionId });
 assert.equal(r.body.ok, true);
 assert.deepEqual(state.archivedSessionIds, []);
 assert.equal(
@@ -151,7 +151,7 @@ assert.ok(before.equals(after));
 
 // 7) deleting a ghost id (no files) still clears the marker
 state = { archivedSessionIds: ['session-ghost'] };
-r = await call('/dsh-archive-mgr/api/delete', 'POST', { sessionIds: ['session-ghost'] });
+r = await call('/dsh-archive/api/delete', 'POST', { sessionIds: ['session-ghost'] });
 assert.equal(r.body.ok, true);
 assert.deepEqual(state.archivedSessionIds, []);
 assert.deepEqual(

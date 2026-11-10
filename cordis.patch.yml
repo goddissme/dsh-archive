@@ -1,4 +1,4 @@
-# dsh-archive-mgr bundle patch: inserts its host plugin row into the profile.
+# dsh-archive bundle patch: inserts its host plugin row into the profile.
 - insert:
     - id: archive-mgr
-      name: dsh-archive-mgr
+      name: dsh-archive
