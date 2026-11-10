@@ -1,4 +1,4 @@
-# dsh-archive-delete
+# dsh-archive-mgr
 
 DeepSeek Harness 归档会话清理插件：**把已归档的会话真正删掉**（先进本地回收站，可还原），也可以取消归档、清空回收站。
 
@@ -10,13 +10,13 @@ DSH 官方的「归档」只是把会话从侧栏隐藏，日志永远留在磁�
 
 ```sh
 # 1) 本地目录（开发/试用）
-dsh plugin --profile desktop add ./dsh-archive-delete
+dsh plugin --profile desktop add ./dsh-archive-mgr
 
 # 2) 打包后的 tarball（分发）
-dsh plugin --profile desktop add ./dsh-archive-delete-0.1.0.tgz
+dsh plugin --profile desktop add ./dsh-archive-mgr-0.2.0.tgz
 
 # 3) GitHub 源码（本插件零构建，纯 JS，装完即可用）
-dsh plugin --profile desktop add github:<you>/dsh-archive-delete
+dsh plugin --profile desktop add github:<you>/dsh-archive-mgr
 ```
 
 桌面版也可以直接让 DSH 的插件管理器安装本地目录或 tarball（`dsh plugin add` 与「设置 → 插件」走同一套 pnpm + profile 注册）。
@@ -42,7 +42,7 @@ dsh plugin --profile desktop add github:<you>/dsh-archive-delete
 |---|---|
 | 会话日志 | `$DSH_HOME/sessions/<工作区编码>/<会话ID>/session.v4.jsonl.zstd` |
 | 投影缓存 | `$DSH_HOME/storages/session_projcache/sessions/<会话ID>.json` |
-| 回收站 | `$DSH_HOME/archive-delete/trash/<时间戳>-<会话ID>/`（含 `session/`、`projection.json`、`meta.json`） |
+| 回收站 | `$DSH_HOME/archive-mgr/trash/<时间戳>-<会话ID>/`（含 `session/`、`projection.json`、`meta.json`） |
 | 归档标记 | `$DSH_HOME/storages/workspace.json` 的 `global.archivedSessionIds` |
 
 `$DSH_HOME` 默认是 `~/.dsh`，可用环境变量覆盖。
@@ -58,10 +58,10 @@ dsh plugin --profile desktop add github:<you>/dsh-archive-delete
 ## 卸载
 
 ```sh
-dsh plugin --profile desktop remove dsh-archive-delete
+dsh plugin --profile desktop remove dsh-archive-mgr
 ```
 
-回收站目录 `$DSH_HOME/archive-delete/` 会保留，可自行删除；卸载不会删除任何会话。
+回收站目录 `$DSH_HOME/archive-mgr/` 会保留，可自行删除；卸载不会删除任何会话。
 
 ## 兼容性
 
@@ -76,7 +76,7 @@ dsh plugin --profile desktop remove dsh-archive-delete
 npm publish          # 已用 files 白名单，只发布 src/lib/cordis.patch.yml/README/LICENSE
 ```
 
-或打成 tarball 分发：`npm pack`（产物 `dsh-archive-delete-0.1.0.tgz`）。
+或打成 tarball 分发：`npm pack`（产物 `dsh-archive-mgr-0.2.0.tgz`）。
 
 ## 开发
 
@@ -87,8 +87,8 @@ npm test              # 等价于 node test/smoke.mjs
 结构：
 
 ```
-src/index.js      宿主插件：列表 / 删除 / 还原 / 彻底删除 / 清空 / 启动核对（HTTP API /dsh-archive-delete/api/*）
+src/index.js      宿主插件：列表 / 删除 / 还原 / 彻底删除 / 清空 / 启动核对（HTTP API /dsh-archive-mgr/api/*）
 lib/client.js     客户端插件：右下角入口 + 面板 + 确认框（ModuleLoader 格式，无需构建）
-cordis.patch.yml  组合包 patch：插入 archive-delete 这一行
+cordis.patch.yml  组合包 patch：插入 archive-mgr 这一行
 test/smoke.mjs    路由 + 文件移动 + 状态串行化的断言测试
 ```

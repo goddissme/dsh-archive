@@ -1,18 +1,18 @@
 /**
- * dsh-archive-delete 鈥?host half.
+ * dsh-archive-mgr 鈥?host half.
  *
  * Archived-session cleaner for DeepSeek Harness. The native UI only *hides*
  * an archived session (its log stays on disk forever); this plugin lists the
  * archived sessions and gives them three outcomes:
  *
  *   - 鍒犻櫎       move the session log + projection cache into a local trash
- *                (`$DSH_HOME/archive-delete/trash/<ts>-<id>/`) and drop the
+ *                (`$DSH_HOME/archive-mgr/trash/<ts>-<id>/`) and drop the
  *                archived id from the workspace registry.
  *   - 鎭㈠       drop the archived id only (the session goes back to the
  *                sidebar, bytes untouched).
  *   - 鍥炴敹绔?    杩樺師 (files back + unarchive) / 褰诲簳鍒犻櫎 / 娓呯┖.
  *
- * HTTP API (same origin, prefix /dsh-archive-delete/api):
+ * HTTP API (same origin, prefix /dsh-archive-mgr/api):
  *   GET  /archived                     -> { total, items }
  *   POST /unarchive     { sessionId }  -> { ok }
  *   POST /delete        { sessionIds } -> { deleted, failed }
@@ -29,14 +29,14 @@ import { mkdir, readFile, writeFile, readdir, rename, rm, stat } from 'node:fs/p
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const name = 'dsh-archive-delete';
+export const name = 'dsh-archive-mgr';
 
 const DSH_HOME = process.env.DSH_HOME && process.env.DSH_HOME.trim()
   ? process.env.DSH_HOME.trim()
   : join(homedir(), '.dsh');
 const SESSIONS_DIR = join(DSH_HOME, 'sessions');
 const PROJCACHE_DIR = join(DSH_HOME, 'storages', 'session_projcache', 'sessions');
-const TRASH_DIR = join(DSH_HOME, 'archive-delete', 'trash');
+const TRASH_DIR = join(DSH_HOME, 'archive-mgr', 'trash');
 const TRASH_VERSION = 1;
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ function makeLister(getRegistry, getQuery) {
           if (h && h.id !== undefined) headers.set(String(h.id), h);
         }
       }
-    } catch (e) { console.error('[dsh-archive-delete] listSessions failed', e); }
+    } catch (e) { console.error('[dsh-archive-mgr] listSessions failed', e); }
 
     const titles = new Map();
     try {
@@ -186,7 +186,7 @@ function makeLister(getRegistry, getQuery) {
           }
         }
       }
-    } catch (e) { console.error('[dsh-archive-delete] readTitleSnapshots failed', e); }
+    } catch (e) { console.error('[dsh-archive-mgr] readTitleSnapshots failed', e); }
 
     const wsBySession = new Map();
     try {
@@ -200,7 +200,7 @@ function makeLister(getRegistry, getQuery) {
           if (!wsBySession.has(key)) wsBySession.set(key, meta);
         }
       }
-    } catch (e) { console.error('[dsh-archive-delete] workspace membership failed', e); }
+    } catch (e) { console.error('[dsh-archive-mgr] workspace membership failed', e); }
 
     const items = [];
     for (const id of ids) {
@@ -391,7 +391,7 @@ export function apply(ctx) {
         try {
           await restoreTrashEntry(stashed.deletedAt + '-' + sessionId);
           await rm(join(TRASH_DIR, stashed.deletedAt + '-' + sessionId), { recursive: true, force: true });
-        } catch (inner) { console.error('[dsh-archive-delete] rollback failed', inner); }
+        } catch (inner) { console.error('[dsh-archive-mgr] rollback failed', inner); }
         throw e;
       }
       return { stashed: true };
@@ -447,22 +447,22 @@ export function apply(ctx) {
 
     // Client liveness heartbeat: the panel's first mount drops a timestamp so
     // a missing button can be told apart from a missing route.
-    register('/dsh-archive-delete/api/hello', async (req, res) => {
+    register('/dsh-archive-mgr/api/hello', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try {
-        await mkdir(join(DSH_HOME, 'archive-delete'), { recursive: true });
-        await writeFile(join(DSH_HOME, 'archive-delete', 'client-seen.json'), JSON.stringify({ at: Date.now() }), 'utf8');
+        await mkdir(join(DSH_HOME, 'archive-mgr'), { recursive: true });
+        await writeFile(join(DSH_HOME, 'archive-mgr', 'client-seen.json'), JSON.stringify({ at: Date.now() }), 'utf8');
       } catch { /* best effort */ }
       sendJson(res, 200, { ok: true });
     });
 
-    register('/dsh-archive-delete/api/archived', async (req, res) => {
+    register('/dsh-archive-mgr/api/archived', async (req, res) => {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'method-not-allowed' });
       try { sendJson(res, 200, await listArchived()); }
       catch (e) { sendJson(res, 500, { total: 0, items: [], error: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/unarchive', async (req, res) => {
+    register('/dsh-archive-mgr/api/unarchive', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try {
         const body = await readJsonBody(req);
@@ -473,7 +473,7 @@ export function apply(ctx) {
       } catch (e) { sendJson(res, 500, { ok: false, error: 'failed', message: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/delete', async (req, res) => {
+    register('/dsh-archive-mgr/api/delete', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try {
         const body = await readJsonBody(req);
@@ -490,13 +490,13 @@ export function apply(ctx) {
       } catch (e) { sendJson(res, 500, { ok: false, error: 'failed', message: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/trash', async (req, res) => {
+    register('/dsh-archive-mgr/api/trash', async (req, res) => {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'method-not-allowed' });
       try { sendJson(res, 200, await listTrash()); }
       catch (e) { sendJson(res, 500, { total: 0, items: [], error: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/trash/restore', async (req, res) => {
+    register('/dsh-archive-mgr/api/trash/restore', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try {
         const body = await readJsonBody(req);
@@ -505,7 +505,7 @@ export function apply(ctx) {
       } catch (e) { sendJson(res, 500, { ok: false, error: 'failed', message: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/trash/delete', async (req, res) => {
+    register('/dsh-archive-mgr/api/trash/delete', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try {
         const body = await readJsonBody(req);
@@ -514,20 +514,20 @@ export function apply(ctx) {
       } catch (e) { sendJson(res, 500, { ok: false, error: 'failed', message: String((e && e.message) || e) }); }
     });
 
-    register('/dsh-archive-delete/api/trash/empty', async (req, res) => {
+    register('/dsh-archive-mgr/api/trash/empty', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method-not-allowed' });
       try { sendJson(res, 200, await emptyTrash()); }
       catch (e) { sendJson(res, 500, { removed: 0, error: String((e && e.message) || e) }); }
     });
 
-    console.log('[dsh-archive-delete] host routes mounted');
+    console.log('[dsh-archive-mgr] host routes mounted');
   });
 
   // Startup reconciliation: drop archived ids whose log is gone, and sweep
   // projection caches left behind for sessions that no longer exist (the
   // native projection-cache service can flush a stale cache on shutdown).
   ctx.inject(['workspaceRegistry', 'sessionQuery'], (sub) => {
-    const timer = setTimeout(() => { reconcile().catch((e) => console.error('[dsh-archive-delete] reconcile failed', e)); }, 3000);
+    const timer = setTimeout(() => { reconcile().catch((e) => console.error('[dsh-archive-mgr] reconcile failed', e)); }, 3000);
     timer.unref && timer.unref();
   });
 
@@ -554,7 +554,7 @@ export function apply(ctx) {
         await registrySetState(registry, { ...current, archivedSessionIds: next });
         return { changed: true };
       }).catch(() => {});
-      console.log('[dsh-archive-delete] removed ' + ghosts.length + ' ghost archived id(s)');
+      console.log('[dsh-archive-mgr] removed ' + ghosts.length + ' ghost archived id(s)');
     }
     // 2) orphan projection caches
     let files;
@@ -569,8 +569,8 @@ export function apply(ctx) {
         swept += 1;
       } catch { /* ignore */ }
     }
-    if (swept > 0) console.log('[dsh-archive-delete] swept ' + swept + ' orphan projection cache(s)');
+    if (swept > 0) console.log('[dsh-archive-mgr] swept ' + swept + ' orphan projection cache(s)');
   }
 
-  console.log('[dsh-archive-delete] host ready');
+  console.log('[dsh-archive-mgr] host ready');
 }
