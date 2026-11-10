@@ -443,7 +443,19 @@ export function apply(ctx) {
 
   ctx.inject(['webServer'], (sub) => {
     const web = sub.webServer;
-    const register = (path, handler) => web.register({ kind: 'exact', path, handler });
+    // A plugin that is unloaded must stop answering. Some hosts keep routes
+    // registered after dispose, so every handler is gated on `mounted` and the
+    // gate is cleared by the effect below — a stale route then answers 404
+    // instead of serving a dead plugin.
+    let mounted = true;
+    const disposers = [];
+    const register = (path, handler) => {
+      const gated = (req, res) => (mounted
+        ? handler(req, res)
+        : sendJson(res, 404, { error: 'not-found', message: 'plugin unloaded' }));
+      const off = web.register({ kind: 'exact', path, handler: gated });
+      if (typeof off === 'function') disposers.push(off);
+    };
 
     // Client liveness heartbeat: the panel's first mount drops a timestamp so
     // a missing button can be told apart from a missing route.
@@ -521,6 +533,19 @@ export function apply(ctx) {
     });
 
     console.log('[dsh-archive-mgr] host routes mounted');
+
+    // Dispose hook: unregister what the host lets us, and always close the
+    // gate so a leaked route can no longer answer.
+    const teardown = () => {
+      mounted = false;
+      for (const off of disposers) {
+        try { off(); } catch { /* ignore */ }
+      }
+      console.log('[dsh-archive-mgr] host routes unmounted');
+    };
+    if (typeof sub.effect === 'function') {
+      sub.effect(() => teardown);
+    }
   });
 
   // Startup reconciliation: drop archived ids whose log is gone, and sweep
