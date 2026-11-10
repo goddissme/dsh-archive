@@ -1,0 +1,4 @@
+# dsh-archive-delete bundle patch: inserts its host plugin row into the profile.
+- insert:
+    - id: archive-delete
+      name: dsh-archive-delete

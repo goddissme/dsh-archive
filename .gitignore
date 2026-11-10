@@ -1,0 +1,13 @@
+# dependencies / build output
+node_modules/
+*.tgz
+
+# editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# local scratch
+.tmp/

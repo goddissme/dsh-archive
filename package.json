@@ -1,0 +1,42 @@
+{
+  "name": "dsh-archive-delete",
+  "version": "0.1.0",
+  "description": "Archived-session cleaner for DeepSeek Harness: list archived sessions, delete them into a local recycle bin, restore, purge, or unarchive back to the sidebar.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "pack": "npm pack"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "plugin",
+    "archive",
+    "trash",
+    "sessions"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  }
+}
