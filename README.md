@@ -13,7 +13,7 @@ DSH 官方的「归档」只是把会话从侧栏隐藏，日志永远留在磁�
 dsh plugin --profile desktop add ./dsh-archive-mgr
 
 # 2) 打包后的 tarball（分发）
-dsh plugin --profile desktop add ./dsh-archive-mgr-0.2.0.tgz
+dsh plugin --profile desktop add ./dsh-archive-mgr-0.2.1.tgz
 
 # 3) GitHub 源码（本插件零构建，纯 JS，装完即可用）
 dsh plugin --profile desktop add github:<you>/dsh-archive-mgr
@@ -30,6 +30,8 @@ dsh plugin --profile desktop add github:<you>/dsh-archive-mgr
 - 列出所有已归档会话，按创建时间倒序，显示标题、工作区路径、创建时间、占用大小
 - **恢复**：取消归档，会话立刻回到侧栏原工作区（不动文件）
 - **删除**：二次确认后把会话日志移入本地回收站，并从归档列表移除
+
+删除会同步清理界面的会话目录：宿主把已删除的会话从内存中的会话表里摘除，并广播 `api-session/removed`，所以侧栏里的那一行会立即消失，**不需要重启软件**。从回收站还原后会重新拉取一次会话列表，会话立刻回到侧栏。
 
 **回收站**
 - **还原**：文件归位并自动取消归档，会话回到侧栏
@@ -76,7 +78,19 @@ dsh plugin --profile desktop remove dsh-archive-mgr
 npm publish          # 已用 files 白名单，只发布 src/lib/cordis.patch.yml/README/LICENSE
 ```
 
-或打成 tarball 分发：`npm pack`（产物 `dsh-archive-mgr-0.2.0.tgz`）。
+或打成 tarball 分发：`npm pack`（产物 `dsh-archive-mgr-0.2.1.tgz`）。
+
+## 更新日志
+
+### 0.2.1
+- 修复：删除归档会话后，该会话仍留在侧栏工作区列表里、必须重启 DSH 才消失。
+  宿主现在会在删除成功后把会话从内存会话表中摘除（若是活动会话），并广播
+  `api-session/removed`，客户端会话目录即时收敛；回收站还原后也会主动刷新会话列表。
+- 删除接口新增 `catalogRemoved` 回执，客户端据此决定是否需要重新拉取列表，避免
+  活动会话残留行被刷新重新带回。
+
+### 0.2.0
+- 包名改为 `dsh-archive-mgr`；插件卸载后路由立即失效。
 
 ## 开发
 

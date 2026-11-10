@@ -37,9 +37,20 @@ const query = {
 };
 
 const routes = new Map();
+const events = [];
+let liveSessionPresent = true;
+let detached = 0;
+const liveSession = { id: sessionId };
+const sessions = {
+  get: (id) => (liveSessionPresent && id === sessionId ? liveSession : undefined),
+  liveEntryFor: () => ({
+    detach: () => { detached += 1; liveSessionPresent = false; },
+  }),
+};
 const ctx = {
-  get: (n) => ({ workspaceRegistry: registry, sessionQuery: query, timer: {} })[n],
+  get: (n) => ({ workspaceRegistry: registry, sessionQuery: query, sessions })[n],
   inject: (deps, cb) => { cb(ctx); },
+  emit: (event, ...args) => { events.push([event, ...args]); },
   webServer: { register: (route) => routes.set(route.path, route.handler) },
 };
 
@@ -81,6 +92,13 @@ assert.deepEqual(state.archivedSessionIds, [sessionId]);
 // 2) delete -> moves to trash, drops the archived marker
 r = await call('/dsh-archive-mgr/api/delete', 'POST', { sessionIds: [sessionId] });
 assert.equal(r.body.ok, true, JSON.stringify(r.body));
+assert.equal(r.body.deleted[0].catalogRemoved, true, 'a deletable session leaves the live catalog');
+assert.equal(detached, 1, 'the live session is detached so host list no longer returns it');
+assert.deepEqual(
+  events.filter(([name]) => name === 'api-session/removed').map(([, id]) => id),
+  [sessionId],
+  'clients are told to drop the deleted row immediately',
+);
 assert.equal(existsSync(sessionDir), false, 'session dir should be gone');
 assert.equal(existsSync(join(projcacheDir, sessionId + '.json')), false, 'cache should be moved');
 assert.deepEqual(state.archivedSessionIds, []);
@@ -124,6 +142,10 @@ const before = await readFile(join(sessionDir, 'session.v4.jsonl.zstd'));
 r = await call('/dsh-archive-mgr/api/unarchive', 'POST', { sessionId });
 assert.equal(r.body.ok, true);
 assert.deepEqual(state.archivedSessionIds, []);
+assert.equal(
+  events.filter(([name, id]) => name === 'api-session/removed' && id === sessionId).length,
+  2, // only the two deletes above; unarchiving must not remove the row
+);
 const after = await readFile(join(sessionDir, 'session.v4.jsonl.zstd'));
 assert.ok(before.equals(after));
 
@@ -132,6 +154,11 @@ state = { archivedSessionIds: ['session-ghost'] };
 r = await call('/dsh-archive-mgr/api/delete', 'POST', { sessionIds: ['session-ghost'] });
 assert.equal(r.body.ok, true);
 assert.deepEqual(state.archivedSessionIds, []);
+assert.deepEqual(
+  events.filter(([name]) => name === 'api-session/removed').map(([, id]) => id),
+  [sessionId, sessionId, 'session-ghost'],
+  'a cold row is still evicted client-side',
+);
 
 await rm(home, { recursive: true, force: true });
 console.log('smoke: all assertions passed');

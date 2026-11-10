@@ -1,6 +1,6 @@
 {
   "name": "dsh-archive-mgr",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Archived-session cleaner for DeepSeek Harness: list archived sessions, delete them into a local recycle bin, restore, purge, or unarchive back to the sidebar.",
   "type": "module",
   "main": "./src/index.js",

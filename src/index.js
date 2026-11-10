@@ -365,6 +365,48 @@ export function apply(ctx) {
   const ops = makeRegistryOps(registryOf);
   const listArchived = makeLister(registryOf, queryOf);
 
+  /**
+   * Drop a deleted session from everything the UI reads.
+   *
+   * Removing the id from `archivedSessionIds` makes the session visible again
+   * on every grouping surface, but the browser keeps its own session catalog:
+   * it only learns about removals from `api-session/removed` (or a full list
+   * refresh). A cold archived session therefore stayed in the sidebar until
+   * the next app start, because nothing told the client it was gone.
+   *
+   * A live session is detached first so the next Host `session.list` no longer
+   * returns it (a live row wins over persistence and would otherwise
+   * resurrect on refresh); detaching also emits `session/disposed`, which the
+   * Session Controller relays as the same removal event. The explicit emit
+   * covers the common cold case and any Host that cannot detach.
+   */
+  function forgetSession(sessionId) {
+    let live = false;
+    let detached = false;
+    try {
+      const sessions = ctx.get('sessions');
+      if (sessions && typeof sessions.get === 'function') {
+        const session = sessions.get(sessionId);
+        live = session !== undefined;
+        if (live && typeof sessions.liveEntryFor === 'function') {
+          const entry = sessions.liveEntryFor(session);
+          if (entry && typeof entry.detach === 'function') {
+            entry.detach();
+            detached = true;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[dsh-archive-mgr] live session detach failed', e);
+    }
+    try {
+      ctx.emit('api-session/removed', sessionId);
+    } catch (e) {
+      console.warn('[dsh-archive-mgr] session removal notification failed', e);
+    }
+    return { live, detached };
+  }
+
   const unarchiveOne = async (sessionId) => {
     const r = await ops.unarchive(sessionId);
     return r.ok ? { ok: true, changed: r.result ? r.result.changed : false } : r;
@@ -401,7 +443,16 @@ export function apply(ctx) {
     if (!moved.result || !moved.result.stashed) {
       return { ok: true, sessionId, skipped: true };
     }
-    return { ok: true, sessionId, trashId: stashed.deletedAt + '-' + sessionId, sizeBytes: stashed.sizeBytes };
+    const catalog = forgetSession(sessionId);
+    return {
+      ok: true,
+      sessionId,
+      trashId: stashed.deletedAt + '-' + sessionId,
+      sizeBytes: stashed.sizeBytes,
+      // The sidebars can trust their own catalog again: the live entry is gone
+      // (or was cold) and the removal event already went out.
+      catalogRemoved: !catalog.live || catalog.detached,
+    };
   };
 
   const restoreOne = async (trashId) => {
